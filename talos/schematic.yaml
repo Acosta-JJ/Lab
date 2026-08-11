@@ -1,0 +1,13 @@
+# Image Factory schematic for the Raspberry Pi 5 nodes.
+# ID: b00ac8400b2ad823d3d5e972136dd89c0d960d58e0ff2b12d5b8b87e9d53e670
+# Regenerate: curl -X POST --data-binary @schematic.yaml https://factory.talos.dev/schematics
+
+overlay:
+  image: siderolabs/sbc-raspberrypi
+  name: rpi_5
+
+customization:
+  systemExtensions:
+    officialExtensions:
+      - siderolabs/iscsi-tools      # Longhorn: iscsiadm + iscsi_tcp module
+      - siderolabs/util-linux-tools # Longhorn: nsenter, fstrim
