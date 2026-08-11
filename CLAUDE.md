@@ -37,11 +37,20 @@ points of failure; node-level HA does not cover them.
 |---|---|
 | Talos version | v1.13.8 (latest stable as of 2026-08-11) |
 | Schematic ID | `b00ac8400b2ad823d3d5e972136dd89c0d960d58e0ff2b12d5b8b87e9d53e670` |
-| Image | `metal-arm64.raw.xz` from Image Factory, downloaded, not yet flashed |
+| `rpi-1` | 128 GB card, booted, **in maintenance mode**, DHCP `192.168.3.102` |
+| `rpi-2`, `rpi-3` | Not flashed. **Update their EEPROM first.** |
 | Cluster | Not bootstrapped yet |
 
-Next: flash the three SD cards, boot node 1 in maintenance mode, and read the
-network interface name and disk name needed to write the machine config.
+Values read from `rpi-1` in maintenance mode, needed to write the machine
+config — identical on all three nodes (same hardware and image):
+
+| | |
+|---|---|
+| Network interface | `end0` |
+| Install disk | `/dev/mmcblk0` (transport `mmc`) |
+
+Next: pick static IPs and the VIP, write the machine config, apply it to all
+three, then bootstrap etcd on one node only.
 
 ## Hard-won facts
 
@@ -140,6 +149,53 @@ is still satisfiable, so the volume self-heals instead of sitting `Degraded`
 until the node returns. It also halves the space and the rebuild traffic, both
 scarce on SD over a single 1 GbE link. Cost: two copies instead of three.
 Decide when deploying Longhorn.
+
+### Updating the Pi 5 EEPROM is mandatory, not optional
+
+**This cost hours on the first node.** A Pi 5 with a stock/outdated bootloader
+EEPROM boots Raspberry Pi OS perfectly and fails to boot Talos, with no error
+code: steady green LED, fan spinning, and **no ethernet link**, because the
+kernel never starts.
+
+The reason is that the two boot chains differ:
+
+```
+Raspberry Pi OS:  EEPROM -> kernel8.img -> Linux
+Talos:            EEPROM -> u-boot.bin -> U-Boot -> kernel -> Linux
+```
+
+Talos chainloads U-Boot (`kernel=u-boot.bin` in `config.txt`), a step Pi OS
+never exercises. So "Pi OS boots fine" proves nothing about the EEPROM being
+new enough for Talos.
+
+Update it with Raspberry Pi Imager: *Misc utility images -> Bootloader (Pi 5
+family) -> SD Card Boot*, write to a spare card, boot the Pi with only that
+card, wait for the **fast continuous green blink**, power off. No OS or SSH
+needed. **Do this on every board before flashing Talos.**
+
+Symptom triage when a node does not come up:
+
+| Observation | Meaning |
+|---|---|
+| No ethernet link LED | Kernel never booted — suspect EEPROM/U-Boot |
+| Ethernet link, no IP | Kernel booted; DHCP or network config problem |
+| Counted LED blink pattern | Firmware-level error, see the Talos RPi docs table |
+
+### Flashing: verify, never assume
+
+Two separate failures made a flash appear to succeed while the card was
+untouched:
+
+1. **The SD write-protect tab.** A locked card reports `Media Read-Only: Yes`
+   in `diskutil info` and silently discards everything. Check it first.
+2. **No read-back verification.** `dd` does not verify. Raspberry Pi Imager
+   does, so prefer it — and it takes the `.xz` directly (its file picker filters
+   by extension and will not show a `.raw`).
+
+Verify after writing with `diskutil list`: a correctly flashed card shows a
+**GPT** scheme with EFI ~105 MB, BIOS Boot 1 MB, Linux ~2.1 GB, META 1 MB, and
+the **rest of the card unallocated**. `EPHEMERAL` is only created and grown on
+first boot, so unallocated space is expected until the node has booted once.
 
 ### Raspberry Pi 5 specifics
 
