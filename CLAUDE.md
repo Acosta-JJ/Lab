@@ -14,7 +14,7 @@ is acceptable and expected.
 | Item | Value |
 |---|---|
 | Nodes | 3x Raspberry Pi 5 |
-| Storage | SD cards only — **no NVMe, no USB SSD** |
+| Storage | SD cards only — **no NVMe, no USB SSD**. Sizes are uneven: 1x 128 GB, 2x 32 GB |
 | Network | Single 1 GbE NIC per node, all on one unmanaged switch, one power strip |
 
 Everything shares one power strip and one switch. Those are the real single
@@ -117,6 +117,29 @@ etcd fsyncs constantly and SD cards have poor write latency and limited
 endurance. Expect the cards to be consumables. Raise etcd `heartbeat-interval`
 and `election-timeout` in the machine config so a slow fsync does not trigger
 spurious leader elections — the highest-value tuning available here.
+
+The cards are also **uneven (128 / 32 / 32 GB)**, which constrains capacity more
+than the total suggests:
+
+- With one replica per node, **replicated capacity is bounded by the smallest
+  node**. The extra ~96 GB on the large card cannot hold replicated data; it only
+  buys headroom for container images and logs on that one node.
+- On a 32 GB card: ~29 GiB of `EPHEMERAL`, minus 6-8 GB of container images
+  (control plane plus Longhorn), minus Longhorn's default 25 %
+  `storageMinimalAvailablePercentage` reserve. Budget **~12-15 GiB of usable
+  volume space** per small node.
+- kubelet starts evicting pods and garbage-collecting images below 10 % free.
+  On a slow card that cascades badly, so keep well clear of the threshold.
+- The 32 GB cards have fewer spare blocks and will wear out first. They are the
+  ones to monitor and the first to replace.
+
+**Open decision — Longhorn replica count.** Default is 3, one per node. With
+exactly 3 nodes, **2 replicas is arguably better here**: when a node dies the
+missing replica can be rebuilt onto the third node because strict anti-affinity
+is still satisfiable, so the volume self-heals instead of sitting `Degraded`
+until the node returns. It also halves the space and the rebuild traffic, both
+scarce on SD over a single 1 GbE link. Cost: two copies instead of three.
+Decide when deploying Longhorn.
 
 ### Raspberry Pi 5 specifics
 
