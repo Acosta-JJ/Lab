@@ -1,0 +1,68 @@
+# ---------------------------------------------------------------
+# Credenciales del cluster - NUNCA subir
+# ---------------------------------------------------------------
+# Talos: identidad de administrador y CA del cluster.
+# Perder secrets.yaml = no poder añadir nodos nunca mas.
+# Filtrarlo = control total del cluster para quien lo lea.
+talosconfig
+secrets.yaml
+
+# Configs generados por `talosctl gen config`: llevan los
+# certificados y tokens del cluster embebidos en claro.
+controlplane.yaml
+worker.yaml
+
+# Kubernetes
+kubeconfig
+kubeconfig-*
+.kube/
+
+# Claves y certificados sueltos
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Claves de cifrado (SOPS / age)
+*.agekey
+age.key
+.sops.yaml.local
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
+
+# ---------------------------------------------------------------
+# Excepcion: ficheros cifrados si algun dia usas SOPS.
+# Estos SI se suben, el secreto viaja cifrado.
+# ---------------------------------------------------------------
+!*.enc.yaml
+!*.sops.yaml
+
+# ---------------------------------------------------------------
+# Herramientas
+# ---------------------------------------------------------------
+# Helm
+charts/*.tgz
+*.tgz
+
+# Terraform / OpenTofu
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# ---------------------------------------------------------------
+# Sistema y editores
+# ---------------------------------------------------------------
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+.idea/
+.vscode/
+*.swp
+*~
