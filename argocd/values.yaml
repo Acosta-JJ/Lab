@@ -19,6 +19,19 @@ server:
 
 repoServer:
   replicas: 1
+  # The liveness probe hits /healthz?full=true, which makes the repo-server
+  # render manifests as part of the check. Rendering a chart the size of
+  # kube-prometheus-stack on a Raspberry Pi's ARM cores takes longer than the
+  # default timeout, so Kubernetes killed it mid-render — 11 restarts in a row,
+  # which surfaced as "connection refused" in every Argo sync.
+  livenessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 60
+    timeoutSeconds: 30
+    failureThreshold: 5
+  readinessProbe:
+    timeoutSeconds: 15
+    failureThreshold: 5
 
 applicationSet:
   replicas: 1

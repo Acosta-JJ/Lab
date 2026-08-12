@@ -11,18 +11,13 @@ kube-prometheus-stack:
   kubeProxy:
     enabled: false
 
+  # The chart discovers etcd through a headless Service backed by a hand-written
+  # v1 Endpoints object. That resource is deprecated in Kubernetes 1.33+ and
+  # Argo CD never applied it, leaving the job permanently absent. Since Talos
+  # serves etcd metrics on a fixed port on every node, static targets are both
+  # simpler and one moving part fewer.
   kubeEtcd:
-    # The chart already defaults to port 2381 over plain HTTP, which is what
-    # Talos exposes. What it cannot do is find etcd: on Talos the pods carry
-    # none of the labels the chart selects on, so with the default empty list
-    # the job simply never appears. The control plane IPs go here by hand.
-    endpoints:
-      - 192.168.1.11
-      - 192.168.1.12
-      - 192.168.1.13
-    service:
-      port: 2381
-      targetPort: 2381
+    enabled: false
 
   prometheus:
     prometheusSpec:
@@ -52,6 +47,17 @@ kube-prometheus-stack:
             resources:
               requests:
                 storage: 2Gi
+
+      # Talos exposes etcd metrics unauthenticated on 2381 on every control
+      # plane node. etcd_disk_wal_fsync_duration_seconds is the number that says
+      # whether the SD cards are hurting etcd, so this job earns its keep.
+      additionalScrapeConfigs:
+        - job_name: etcd
+          static_configs:
+            - targets:
+                - 192.168.1.11:2381
+                - 192.168.1.12:2381
+                - 192.168.1.13:2381
 
   grafana:
     # Only stores dashboards and settings created through the UI; the shipped
