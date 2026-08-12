@@ -1,0 +1,134 @@
+# Grafana's sidecar imports any ConfigMap in this namespace carrying the
+# grafana_dashboard label, so a dashboard can live in Git like everything else.
+# The shipped dashboards cover CPU and memory but know nothing about SoC
+# temperature, undervoltage or etcd disk latency, which are the three numbers
+# that actually matter on Raspberry Pi hardware running on SD cards.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-raspberry
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  raspberry.json: |
+    {
+      "title": "Raspberry Pi cluster",
+      "uid": "rpi-cluster",
+      "timezone": "browser",
+      "refresh": "30s",
+      "time": { "from": "now-3h", "to": "now" },
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "SoC temperature",
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 0 },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "celsius",
+              "min": 20,
+              "max": 90,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 70 },
+                  { "color": "red", "value": 80 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "node_thermal_zone_temp",
+              "legendFormat": "{{instance}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "CPU used",
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 0 },
+          "fieldConfig": {
+            "defaults": { "unit": "percent", "min": 0, "max": 100 }
+          },
+          "targets": [
+            {
+              "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+              "legendFormat": "{{instance}}"
+            }
+          ]
+        },
+        {
+          "type": "stat",
+          "title": "Undervoltage alarm (0 = power is fine)",
+          "gridPos": { "h": 6, "w": 8, "x": 0, "y": 9 },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "node_hwmon_in_lcrit_alarm_volts",
+              "legendFormat": "{{instance}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "etcd WAL fsync p99 - SD card health for etcd",
+          "description": "Under 10ms is healthy, under 25ms tolerable. Sustained higher values mean the SD cards are holding etcd back and leader elections will follow.",
+          "gridPos": { "h": 6, "w": 16, "x": 8, "y": 9 },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 0.01 },
+                  { "color": "red", "value": 0.025 }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (instance, le) (rate(etcd_disk_wal_fsync_duration_seconds_bucket[5m])))",
+              "legendFormat": "{{instance}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Memory available",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+          "fieldConfig": { "defaults": { "unit": "bytes" } },
+          "targets": [
+            {
+              "expr": "node_memory_MemAvailable_bytes",
+              "legendFormat": "{{instance}}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "SD card space free on /var",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+          "fieldConfig": { "defaults": { "unit": "bytes" } },
+          "targets": [
+            {
+              "expr": "node_filesystem_avail_bytes{mountpoint=\"/var\"}",
+              "legendFormat": "{{instance}}"
+            }
+          ]
+        }
+      ]
+    }
