@@ -52,11 +52,31 @@ router — the same network the admin laptop uses over Wi-Fi.
 
 | | |
 |---|---|
-| Talos version | v1.13.8 |
+**The cluster is up.** Bootstrapped 2026-08-12.
+
+| | |
+|---|---|
+| Talos / Kubernetes | v1.13.8 / v1.36.2 (kernel 6.18.42-talos arm64, containerd 2.2.6) |
 | Schematic ID | `b00ac8400b2ad823d3d5e972136dd89c0d960d58e0ff2b12d5b8b87e9d53e670` |
-| `rpi-1` | 128 GB card. **Configured and running at `192.168.1.11`.** etcd is `Preparing`, waiting for bootstrap. `ext-iscsid` confirmed running, so the Longhorn extensions are live. |
-| `rpi-2`, `rpi-3` | EEPROM updated. Awaiting flashing and `apply-config`. |
-| Cluster | **Not bootstrapped.** `talosctl bootstrap` runs once, on one node only. |
+| Nodes | `rpi-1`, `rpi-2`, `rpi-3` — all `Ready`, all `control-plane`, **no taints** |
+| etcd | 3 voting members, no learners. Quorum 2, tolerates one node down. |
+| VIP | `192.168.1.10` active; `kubectl` reaches the API through it |
+| CNI | Flannel (Talos default) |
+| kubeconfig | `~/Desktop/Lab-secrets/kubeconfig` |
+
+`talosctl health` passes every check. Control plane components run on all three
+nodes. Restart counts on `kube-scheduler` and `kube-controller-manager` right
+after bootstrap are normal — they race for leadership and the losers restart.
+
+Still to do, roughly in order:
+
+1. **Longhorn** — decide the replica count first (see the open decision below),
+   then the `kubelet.extraMounts` data path and the privileged namespace label.
+2. **A LoadBalancer implementation** (MetalLB or Cilium L2) — the VIP only
+   serves the Kubernetes API, not application services.
+3. **Argo CD** — insurance against losing etcd, not against losing power.
+4. **Backups** — scheduled `talosctl etcd snapshot` and a Longhorn backup target
+   outside the cluster.
 
 ## Repository layout
 
