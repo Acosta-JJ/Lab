@@ -84,15 +84,47 @@ Because the subnet is fixed by the dedicated router, no DNS name or extra
 nodes. Restart counts on `kube-scheduler` and `kube-controller-manager` right
 after bootstrap are normal — they race for leadership and the losers restart.
 
+## Platform
+
+| Component | Version | Notes |
+|---|---|---|
+| Longhorn | 1.11.3 | `longhorn` is the default StorageClass, 2 replicas |
+| Argo CD | chart 10.3.2 (v3.5.0) | Dex disabled, `server.insecure: true` |
+
+**Longhorn.** Data path `/var/mnt/longhorn`, bind-mounted into the kubelet by the
+machine config. Two replicas per volume with strict anti-affinity, rebuilds
+limited to one at a time. Usable replicated capacity is bounded by the small
+nodes: Longhorn sees ~22.7 GiB free on each 32 GB card, minus its 25 % reserve,
+so budget **roughly 16 GiB**. The 111 GiB on `rpi-1` cannot be used for
+replicated data — there is no second large node to pair it with.
+
+**Argo CD and the ApplicationSet pattern.** `argocd/applicationset.yaml` is the
+only object applied by hand. Its git generator scans `apps/*` in this repository
+and creates one Application per directory, named after it, deployed into a
+namespace of the same name (`CreateNamespace=true`). Sync is automated with
+`prune` and `selfHeal`, so deleting a manifest deletes the object and manual
+changes against the cluster are reverted.
+
+**To deploy something new: create a directory under `apps/` and push.** No
+`kubectl` involved. Argo pulls from the public GitHub repo, which is why no
+credentials are configured.
+
+UI: `kubectl -n argocd port-forward svc/argocd-server 8080:80`, user `admin`,
+initial password in the `argocd-initial-admin-secret` secret — change it and
+delete that secret.
+
+`apps/busybox-longhorn-test/` is a deliberate keeper: a 1 Gi Longhorn volume with
+a pod appending a timestamp every 10s. Deleting the pod and finding the previous
+pod's lines still in `/data/heartbeat.log` verifies the whole storage path end to
+end. Verified working 2026-08-12.
+
 Still to do, roughly in order:
 
-1. **Longhorn** — decide the replica count first (see the open decision below),
-   then the `kubelet.extraMounts` data path and the privileged namespace label.
-2. **A LoadBalancer implementation** (MetalLB or Cilium L2) — the VIP only
+1. **A LoadBalancer implementation** (MetalLB or Cilium L2) — the VIP only
    serves the Kubernetes API, not application services.
-3. **Argo CD** — insurance against losing etcd, not against losing power.
-4. **Backups** — scheduled `talosctl etcd snapshot` and a Longhorn backup target
-   outside the cluster.
+2. **Backups** — scheduled `talosctl etcd snapshot` and a Longhorn backup target
+   outside the cluster. Longhorn replicates; it does not back up.
+3. **A dedicated router** so the cluster carries its own subnet (see Addressing).
 
 ## Repository layout
 
