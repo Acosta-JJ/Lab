@@ -11,8 +11,15 @@ kube-prometheus-stack:
   kubeProxy:
     enabled: false
 
-  # Talos exposes etcd metrics on 2381, not the usual 2379.
   kubeEtcd:
+    # The chart already defaults to port 2381 over plain HTTP, which is what
+    # Talos exposes. What it cannot do is find etcd: on Talos the pods carry
+    # none of the labels the chart selects on, so with the default empty list
+    # the job simply never appears. The control plane IPs go here by hand.
+    endpoints:
+      - 192.168.1.11
+      - 192.168.1.12
+      - 192.168.1.13
     service:
       port: 2381
       targetPort: 2381
