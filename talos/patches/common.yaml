@@ -1,0 +1,15 @@
+# Applied to every node at `talosctl gen config` time.
+cluster:
+  # All three nodes are control plane and worker at the same time.
+  allowSchedulingOnControlPlanes: true
+  etcd:
+    extraArgs:
+      # etcd runs on SD cards, whose fsync latency is poor enough that the
+      # defaults (100ms / 1000ms) trigger spurious leader elections, which in
+      # turn make the VIP flap. Slower failover detection is the trade-off.
+      heartbeat-interval: "500"
+      election-timeout: "5000"
+
+machine:
+  install:
+    disk: /dev/mmcblk0

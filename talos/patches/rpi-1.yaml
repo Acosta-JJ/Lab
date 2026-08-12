@@ -1,0 +1,14 @@
+# Applied at `talosctl apply-config` time, per node.
+# Defining a LinkConfig disables the default DHCP client on that link.
+apiVersion: v1alpha1
+kind: HostnameConfig
+hostname: rpi-1
+auto: "off"
+---
+apiVersion: v1alpha1
+kind: LinkConfig
+name: end0
+addresses:
+  - address: 192.168.1.11/24
+routes:
+  - gateway: 192.168.1.1

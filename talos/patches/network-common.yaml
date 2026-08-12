@@ -1,0 +1,13 @@
+# Network settings shared by all three nodes.
+# The VIP is elected through etcd and floats between the control plane nodes.
+# It serves the Kubernetes API only — talosctl always targets the real node IPs.
+apiVersion: v1alpha1
+kind: Layer2VIPConfig
+name: 192.168.1.10
+link: end0
+---
+apiVersion: v1alpha1
+kind: ResolverConfig
+nameservers:
+  - address: 192.168.1.1
+  - address: 1.1.1.1

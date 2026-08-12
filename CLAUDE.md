@@ -15,10 +15,27 @@ is acceptable and expected.
 |---|---|
 | Nodes | 3x Raspberry Pi 5 |
 | Storage | SD cards only — **no NVMe, no USB SSD**. Sizes are uneven: 1x 128 GB, 2x 32 GB |
-| Network | Single 1 GbE NIC per node, all on one unmanaged switch, one power strip |
+| Network | Single 1 GbE NIC per node, TP-Link TL-SG1005D unmanaged switch, one power strip |
 
 Everything shares one power strip and one switch. Those are the real single
 points of failure; node-level HA does not cover them.
+
+## Addressing
+
+Cluster name is `lab`. Everything lives on `192.168.1.0/24`, behind the main
+router — the same network the admin laptop uses over Wi-Fi.
+
+| | |
+|---|---|
+| `rpi-1` | `192.168.1.11/24` |
+| `rpi-2` | `192.168.1.12/24` |
+| `rpi-3` | `192.168.1.13/24` |
+| VIP (Kubernetes API) | `192.168.1.10` |
+| Gateway | `192.168.1.1` |
+| Resolvers | `192.168.1.1`, `1.1.1.1` |
+| Interface / install disk | `end0` / `/dev/mmcblk0` |
+
+`.10`–`.13` must be excluded from the router's DHCP pool.
 
 ## Architecture
 
@@ -35,22 +52,28 @@ points of failure; node-level HA does not cover them.
 
 | | |
 |---|---|
-| Talos version | v1.13.8 (latest stable as of 2026-08-11) |
+| Talos version | v1.13.8 |
 | Schematic ID | `b00ac8400b2ad823d3d5e972136dd89c0d960d58e0ff2b12d5b8b87e9d53e670` |
-| `rpi-1` | 128 GB card, booted, **in maintenance mode**, DHCP `192.168.3.102` |
-| `rpi-2`, `rpi-3` | Not flashed. **Update their EEPROM first.** |
-| Cluster | Not bootstrapped yet |
+| `rpi-1` | 128 GB card. **Configured and running at `192.168.1.11`.** etcd is `Preparing`, waiting for bootstrap. `ext-iscsid` confirmed running, so the Longhorn extensions are live. |
+| `rpi-2`, `rpi-3` | EEPROM updated. Awaiting flashing and `apply-config`. |
+| Cluster | **Not bootstrapped.** `talosctl bootstrap` runs once, on one node only. |
 
-Values read from `rpi-1` in maintenance mode, needed to write the machine
-config — identical on all three nodes (same hardware and image):
+## Repository layout
 
-| | |
-|---|---|
-| Network interface | `end0` |
-| Install disk | `/dev/mmcblk0` (transport `mmc`) |
+```
+talos/schematic.yaml     Image Factory input; the ID in its header comes from it
+talos/patches/
+  common.yaml            scheduling on control plane, install disk, etcd tuning
+  network-common.yaml    VIP and resolvers, shared by all nodes
+  rpi-{1,2,3}.yaml       hostname and static address, applied per node
+```
 
-Next: pick static IPs and the VIP, write the machine config, apply it to all
-three, then bootstrap etcd on one node only.
+`common.yaml` and `network-common.yaml` are passed to `talosctl gen config`; the
+per-node patches are passed to `talosctl apply-config`.
+
+Generated output lives in **`~/Desktop/Lab-secrets/`**, deliberately outside this
+repository: the `.gitignore` would cover it, but this repo is public and secrets
+should not sit in the working tree at all.
 
 ## Hard-won facts
 
@@ -106,6 +129,52 @@ and pods start from images already cached in containerd.
 
 The first boot is always DHCP — the image carries no config. Static addressing
 arrives with the machine config.
+
+### All three nodes and the laptop must share one flat network
+
+A second router (a Huawei box at `192.168.3.1`) was handing out its own
+`192.168.3.0/24` behind the main router. With the switch uplinked to it, the node
+was invisible from the laptop's Wi-Fi and the whole addressing plan had to be
+redone. The switch's uplink belongs on a **LAN port of the main router**.
+
+What matters is the network, not the cabling: a laptop on Wi-Fi reaches a node on
+copper fine, as long as both hang off the same router. If a spare router must be
+reused as a switch, disable its DHCP server and uplink into a LAN port, never the
+WAN port.
+
+Diagnostic that settles it quickly: compare the default gateway's MAC before and
+after unplugging a device, and look up its OUI vendor. A real unmanaged switch
+has no IP, no DHCP and no admin page, so anything answering as a gateway is a
+router.
+
+### Losing `secrets.yaml` does not stop the cluster, it stops repairs
+
+`secrets.yaml` holds the Talos, Kubernetes, etcd and aggregator CAs plus the
+bootstrap tokens. A running cluster does not care if the copy is lost — every
+node has its config on the `STATE` partition. What is lost is the ability to
+generate a valid config for a **new** node, which is exactly what a dead Pi or a
+worn-out SD card requires.
+
+It can be rebuilt from an existing control plane config:
+
+```bash
+talosctl gen secrets --from-controlplane-config controlplane.yaml -o secrets.yaml
+```
+
+So `secrets.yaml` and `controlplane.yaml` recover each other — but they sit in
+the same directory, so one accident takes both. Keep a copy **off this machine**.
+
+### `talosctl` flag placement
+
+`-n/--nodes` and `-e/--endpoints` are subcommand flags, not global ones:
+`talosctl version -n <ip>` works, `talosctl -n <ip> version` fails with
+`unknown shorthand flag`. Set them once instead:
+
+```bash
+export TALOSCONFIG=~/Desktop/Lab-secrets/talosconfig
+talosctl config endpoint 192.168.1.11 192.168.1.12 192.168.1.13
+talosctl config node 192.168.1.11
+```
 
 ### The VIP is for Kubernetes, never for talosctl
 
