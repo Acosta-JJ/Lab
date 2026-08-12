@@ -1,0 +1,24 @@
+# Argo CD values for the lab cluster.
+
+# No SSO here, so Dex is dead weight on a Raspberry Pi.
+dex:
+  enabled: false
+
+configs:
+  params:
+    # Terminate TLS at the ingress/port-forward instead of in the API server.
+    # Without this the server redirects to HTTPS and port-forwarding needs
+    # --insecure-skip-tls-verify on every client.
+    server.insecure: true
+
+controller:
+  replicas: 1
+
+server:
+  replicas: 1
+
+repoServer:
+  replicas: 1
+
+applicationSet:
+  replicas: 1

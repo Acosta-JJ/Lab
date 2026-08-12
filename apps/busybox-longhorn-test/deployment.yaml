@@ -1,0 +1,44 @@
+# Writes a timestamp to the volume every 10s. Deleting the pod and reading the
+# file back is the test: the log must survive and keep its earlier lines.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: busybox
+spec:
+  replicas: 1
+  # The volume is ReadWriteOnce, so the old pod must release it before the new
+  # one can attach. Rolling would deadlock.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: busybox
+  template:
+    metadata:
+      labels:
+        app: busybox
+    spec:
+      containers:
+        - name: busybox
+          image: busybox:1.37
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "pod $HOSTNAME started at $(date -Iseconds)" >> /data/heartbeat.log
+              while true; do
+                echo "$(date -Iseconds) alive on $HOSTNAME" >> /data/heartbeat.log
+                sleep 10
+              done
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: busybox-data

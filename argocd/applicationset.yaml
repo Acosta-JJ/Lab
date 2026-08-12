@@ -1,0 +1,43 @@
+# Generates one Argo CD Application per directory under apps/.
+#
+# This is the only object that has to be applied by hand. From here on, adding
+# an application means creating a directory under apps/ and pushing: the
+# generator notices it and the Application appears on its own.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: apps
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+
+  generators:
+    - git:
+        repoURL: https://github.com/Acosta-JJ/Lab.git
+        revision: main
+        directories:
+          - path: apps/*
+
+  template:
+    metadata:
+      # Directory name becomes the Application name.
+      name: '{{.path.basename}}'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/Acosta-JJ/Lab.git
+        targetRevision: main
+        path: '{{.path.path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        # Each app gets its own namespace, named after its directory.
+        namespace: '{{.path.basename}}'
+      syncPolicy:
+        automated:
+          # Delete objects removed from Git.
+          prune: true
+          # Revert manual changes made against the cluster.
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

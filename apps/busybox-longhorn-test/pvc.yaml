@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: busybox-data
+spec:
+  # Named explicitly even though longhorn is the default StorageClass, so the
+  # intent survives a change of default.
+  storageClassName: longhorn
+  accessModes:
+    # Longhorn volumes are block devices: one node mounts them at a time.
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
