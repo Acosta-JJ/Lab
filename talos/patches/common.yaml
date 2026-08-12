@@ -13,3 +13,19 @@ cluster:
 machine:
   install:
     disk: /dev/mmcblk0
+  kubelet:
+    extraMounts:
+      # The kubelet runs in a container and cannot see this host path otherwise.
+      # rshared propagation is required: Longhorn creates mounts that must
+      # propagate back to the host.
+      #
+      # /var/mnt/longhorn, not /var/lib/longhorn: it is the documented path for
+      # Talos 1.10+, and it is where a UserVolumeConfig named `longhorn` would
+      # mount, so moving the data to a dedicated disk later needs no change here.
+      - destination: /var/mnt/longhorn
+        type: bind
+        source: /var/mnt/longhorn
+        options:
+          - bind
+          - rshared
+          - rw

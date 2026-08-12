@@ -1,0 +1,30 @@
+# Longhorn values for the lab cluster.
+
+defaultSettings:
+  # The Talos machine config bind-mounts this path into the kubelet.
+  # The upstream default (/var/lib/longhorn) is not visible to it.
+  defaultDataPath: /var/mnt/longhorn
+
+  # Two replicas, not three. With exactly 3 nodes and strict anti-affinity, a
+  # lost node's replica can be rebuilt onto the remaining node, so volumes
+  # self-heal instead of sitting Degraded until the node returns. It also halves
+  # the space used, which matters on 32 GB SD cards.
+  defaultReplicaCount: 2
+  replicaSoftAntiAffinity: false
+
+  # Rebuild one replica at a time. A rebuild copies whole volumes across the
+  # single 1 GbE link that also carries etcd traffic; saturating it delays etcd
+  # heartbeats, which triggers leader elections and makes the VIP flap.
+  concurrentReplicaRebuildPerNodeLimit: 1
+
+  # Force-delete pods stranded on a downed node. Without this a StatefulSet pod
+  # stays Terminating indefinitely, because only the dead node's kubelet could
+  # confirm it stopped.
+  nodeDownPodDeletionPolicy: delete-both-statefulset-and-deployment-pod
+
+persistence:
+  defaultClass: true
+  # Separate from defaultReplicaCount above: this one governs the default
+  # StorageClass. Leaving it at its default of 3 would silently give every new
+  # PVC three replicas.
+  defaultClassReplicaCount: 2
