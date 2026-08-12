@@ -9,6 +9,23 @@ cluster:
       # turn make the VIP flap. Slower failover detection is the trade-off.
       heartbeat-interval: "500"
       election-timeout: "5000"
+      # Metrics-only endpoint, unauthenticated, separate from the client port.
+      # Needed for Prometheus to see disk fsync latency, which is the number
+      # that says whether the SD cards are hurting etcd. Requires a reboot.
+      listen-metrics-urls: http://0.0.0.0:2381
+
+  # These three bind to 127.0.0.1 by default on Talos, so Prometheus finds
+  # nothing to scrape. Opening them to the node network makes the shipped
+  # ServiceMonitors work.
+  controllerManager:
+    extraArgs:
+      bind-address: 0.0.0.0
+  scheduler:
+    extraArgs:
+      bind-address: 0.0.0.0
+  proxy:
+    extraArgs:
+      metrics-bind-address: 0.0.0.0
 
 machine:
   install:

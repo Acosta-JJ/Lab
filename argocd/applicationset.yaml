@@ -41,3 +41,7 @@ spec:
           selfHeal: true
         syncOptions:
           - CreateNamespace=true
+          # Required by charts with large CRDs: client-side apply stores the
+          # whole manifest in an annotation, and Kubernetes caps annotations at
+          # 262144 bytes. kube-prometheus-stack's CRDs blow past that.
+          - ServerSideApply=true

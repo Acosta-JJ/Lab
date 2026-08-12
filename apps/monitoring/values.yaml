@@ -1,0 +1,69 @@
+# Values are nested under the dependency name, as umbrella charts require.
+kube-prometheus-stack:
+
+  # No alert routing configured yet, and it would cost RAM plus another PVC.
+  alertmanager:
+    enabled: false
+
+  # Talos renders the kube-proxy manifest at bootstrap and does not reconcile
+  # extraArgs into it, so its metrics stay bound to localhost. Disabling this
+  # avoids a scrape target that would fail forever and look like a real fault.
+  kubeProxy:
+    enabled: false
+
+  # Talos exposes etcd metrics on 2381, not the usual 2379.
+  kubeEtcd:
+    service:
+      port: 2381
+      targetPort: 2381
+
+  prometheus:
+    prometheusSpec:
+      # 60s instead of the default 30s. Halves the samples, and therefore the
+      # writes: every sample lands on an SD card twice, once per Longhorn
+      # replica. Resolution is plenty for a 3-node homelab.
+      scrapeInterval: 60s
+      evaluationInterval: 60s
+
+      # Deliberately short. Both limits are set because retention alone would
+      # let a metrics explosion fill the volume before the 24h elapsed.
+      retention: 24h
+      retentionSize: 1500MB
+
+      resources:
+        requests:
+          cpu: 100m
+          memory: 400Mi
+        limits:
+          memory: 1200Mi
+
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: longhorn
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 2Gi
+
+  grafana:
+    # Only stores dashboards and settings created through the UI; the shipped
+    # dashboards come from ConfigMaps and survive without this.
+    persistence:
+      enabled: true
+      type: pvc
+      storageClassName: longhorn
+      accessModes: ["ReadWriteOnce"]
+      size: 1Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 384Mi
+
+  prometheusOperator:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
