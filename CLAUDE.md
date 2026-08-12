@@ -37,6 +37,22 @@ router — the same network the admin laptop uses over Wi-Fi.
 
 `.10`–`.13` must be excluded from the router's DHCP pool.
 
+**Planned: the cluster carries its own subnet.** A dedicated small router will sit
+between the switch and whatever network the cluster is plugged into, always
+serving `192.168.1.0/24` on its LAN side and NATing upstream. The cluster then
+never notices it moved, and no reconfiguration is needed to relocate it.
+
+This matters because changing the subnet after the fact is genuinely hard: etcd
+members register each other by IP (`https://192.168.1.11:2380`) and that list
+lives inside etcd itself. Change all three addresses at once and the members look
+for each other at the old ones, quorum never forms, and there is no quorum to
+issue the command that would fix it. The real options are a rolling
+remove-wipe-rejoin per node with both subnets reachable at once, or a rebuild —
+which is cheap here, since nodes are disposable by design.
+
+Because the subnet is fixed by the dedicated router, no DNS name or extra
+`certSANs` are needed for the API endpoint.
+
 ## Architecture
 
 - All three nodes are **control plane and worker simultaneously**
