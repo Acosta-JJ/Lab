@@ -90,6 +90,33 @@ after bootstrap are normal — they race for leadership and the losers restart.
 |---|---|---|
 | Longhorn | 1.11.3 | `longhorn` is the default StorageClass, 2 replicas |
 | Argo CD | chart 10.3.2 (v3.5.0) | Dex disabled, `server.insecure: true` |
+| kube-prometheus-stack | chart 88.3.0 | 24h retention capped at 1500MB, 60s scrape |
+
+**Monitoring.** Retention is deliberately short and scraping runs at 60s: every
+sample is written twice by Longhorn onto SD cards, which are the consumable part
+of this cluster. Alertmanager is off until there is somewhere to route alerts.
+
+Exposing the control plane required machine config changes, since Talos binds
+those components to localhost. `kube-controller-manager` and `kube-scheduler`
+took `bind-address: 0.0.0.0` and needed no restart; **etcd's
+`listen-metrics-urls` needed a rolling reboot**, and Talos does not allow
+restarting etcd through the API. `kube-proxy` was left alone: Talos renders its
+manifest at bootstrap and does not reconcile `extraArgs` into it, so its
+ServiceMonitor is disabled rather than left failing forever.
+
+etcd is scraped with **static targets**, not the chart's `kubeEtcd` discovery.
+That path builds a headless Service backed by a hand-written `v1 Endpoints`
+object, which is deprecated in Kubernetes 1.33+ and which Argo CD never applied,
+so the job was simply absent with no error anywhere.
+
+**Baseline for `etcd_disk_wal_fsync_duration_seconds` p99, measured 2026-08-12:
+7.9 / 13.6 / 7.9 ms.** Healthy is under 10ms and tolerable under 25ms, so the SD
+cards are keeping up. Watch this number: sustained growth means the cards are
+wearing out and leader elections will follow.
+
+Grafana dashboard `Raspberry Pi cluster` covers SoC temperature, CPU,
+undervoltage alarm, etcd fsync, memory and free space on `/var` — the shipped
+dashboards know nothing about the first three.
 
 **Longhorn.** Data path `/var/mnt/longhorn`, bind-mounted into the kubelet by the
 machine config. Two replicas per volume with strict anti-affinity, rebuilds
@@ -117,6 +144,23 @@ delete that secret.
 a pod appending a timestamp every 10s. Deleting the pod and finding the previous
 pod's lines still in `/data/heartbeat.log` verifies the whole storage path end to
 end. Verified working 2026-08-12.
+
+### Two traps that cost real time on this hardware
+
+**Argo CD's repo-server liveness probe.** Its path is `/healthz?full=true`, which
+makes the server render manifests as part of the health check. Rendering a chart
+the size of kube-prometheus-stack on ARM cores takes longer than the default
+timeout, so Kubernetes killed it mid-render — 11 restarts, and every sync failing
+with `connection refused` against the repo-server. The symptom looks like memory
+exhaustion and is not: check `MemoryPressure` and OOM events before believing
+that. Fixed by raising `repoServer.livenessProbe.timeoutSeconds` in
+`argocd/values.yaml`.
+
+**Grafana dashboards inside Helm templates.** Grafana legend placeholders use the
+same double-brace syntax as Go templates, so Helm evaluates them and the render
+dies with `function "instance" not defined`. Keep dashboard JSON outside
+`templates/` and pull it in with `.Files.Get`. Helm parses comments too, so even
+mentioning such a placeholder in a comment inside a template breaks it.
 
 Still to do, roughly in order:
 
