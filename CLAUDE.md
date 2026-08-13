@@ -162,6 +162,39 @@ dies with `function "instance" not defined`. Keep dashboard JSON outside
 `templates/` and pull it in with `.Files.Get`. Helm parses comments too, so even
 mentioning such a placeholder in a comment inside a template breaks it.
 
+### Planned: remote access
+
+Two mechanisms for two different jobs, deliberately not one for both.
+
+**Cloudflare Tunnel for Grafana only.** `cloudflared` runs in the cluster and
+dials out, so no port is opened and no public IP or working CGNAT traversal is
+needed. **Cloudflare Access must sit in front of it** — publishing Grafana's own
+login to the internet is not acceptable, it has a history of auth CVEs and
+scanners find subdomains within hours. The tunnel token is a secret and this
+repository is public, so this is the task that finally requires SOPS with age;
+`.gitignore` already lets `*.enc.yaml` and `*.sops.yaml` through.
+
+**WireGuard for administration, hosted outside the cluster.** A VPN that runs as
+a pod is unreachable exactly when it is needed: a dead node, lost etcd quorum, a
+broken CNI. It belongs on the router — which pairs neatly with the dedicated
+router already planned for carrying the subnet — or on a separate always-on
+device. It also beats a tunnel for this job, because `kubectl` and especially
+`talosctl` speak gRPC to specific IPs, and being inside the subnet is what makes
+reaching the real node addresses work when the VIP is gone. Tailscale is the
+pragmatic variant if NAT traversal and key handling are not worth the learning.
+
+Note that Talos's **KubeSpan is not this**: it is WireGuard between nodes across
+networks, not client access.
+
+**Argo CD and Longhorn stay off any public tunnel**, Access or not: Argo holds
+cluster-admin over everything. The Kubernetes and Talos APIs are never exposed.
+
+### Grafana's admin password rotates on its own
+
+The chart generates a random password when none is set, and Argo re-renders on
+every sync, so the secret changes underneath you. Set it explicitly from a
+SOPS-encrypted secret once SOPS is in place.
+
 Still to do, roughly in order:
 
 1. **A LoadBalancer implementation** (MetalLB or Cilium L2) — the VIP only
