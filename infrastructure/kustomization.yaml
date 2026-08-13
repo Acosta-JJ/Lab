@@ -1,0 +1,5 @@
+# Cluster add-ons that applications depend on. Reconciled before apps/.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - longhorn

@@ -1,0 +1,65 @@
+# Adopts the release installed by hand on 2026-08-12. releaseName and namespace
+# must match it exactly, otherwise Flux would install a second, parallel copy
+# alongside the running one.
+#
+# Values are identical to what was installed, so the first reconciliation is a
+# no-op upgrade: Helm bumps the revision but renders the same manifests, and no
+# pod restarts. Any drift here would restart storage components underneath live
+# volumes, so change them deliberately.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: longhorn
+  namespace: longhorn-system
+spec:
+  releaseName: longhorn
+  interval: 30m
+  timeout: 20m
+  chart:
+    spec:
+      chart: longhorn
+      version: "1.11.3"
+      sourceRef:
+        kind: HelmRepository
+        name: longhorn
+        namespace: longhorn-system
+  install:
+    crds: Create
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      # Never roll storage back automatically: a half-rolled-back Longhorn is
+      # worse than a failed upgrade that stays put and waits for a human.
+      retries: 0
+
+  values:
+    defaultSettings:
+      # The Talos machine config bind-mounts this path into the kubelet. The
+      # upstream default (/var/lib/longhorn) is not visible to it.
+      defaultDataPath: /var/mnt/longhorn
+
+      # Two replicas, not three. With exactly 3 nodes and strict anti-affinity, a
+      # lost node's replica can be rebuilt onto the remaining node, so volumes
+      # self-heal instead of sitting Degraded until the node returns. It also
+      # halves the space used, which matters on 32 GB SD cards.
+      defaultReplicaCount: 2
+      replicaSoftAntiAffinity: false
+
+      # Rebuild one replica at a time. A rebuild copies whole volumes across the
+      # single 1 GbE link that also carries etcd traffic; saturating it delays
+      # etcd heartbeats, which triggers leader elections and flaps the VIP.
+      concurrentReplicaRebuildPerNodeLimit: 1
+
+      # Force-delete pods stranded on a downed node. Without this a StatefulSet
+      # pod stays Terminating indefinitely, because only the dead node's kubelet
+      # could confirm it stopped.
+      nodeDownPodDeletionPolicy: delete-both-statefulset-and-deployment-pod
+
+    persistence:
+      defaultClass: true
+      # Separate from defaultReplicaCount above: this one governs the default
+      # StorageClass. Leaving it at its default of 3 would silently give every
+      # new PVC three replicas.
+      defaultClassReplicaCount: 2

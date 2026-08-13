@@ -1,0 +1,11 @@
+# Longhorn's manager and CSI components are privileged: they mount host paths,
+# create block devices and run iscsid. Talos enforces the baseline PodSecurity
+# profile by default, which rejects all of that.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: longhorn-system
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged

@@ -1,0 +1,15 @@
+# Cluster add-ons. Applications depend on this one, so a rebuild from scratch
+# installs storage before anything tries to claim a volume from it.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure
+  namespace: flux-system
+spec:
+  interval: 10m
+  path: ./infrastructure
+  prune: true
+  timeout: 20m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
