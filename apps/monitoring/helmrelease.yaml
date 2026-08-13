@@ -84,6 +84,13 @@ spec:
                   - 192.168.1.13:2381
 
     grafana:
+      # Without this the chart generates a random password on every render, so
+      # each reconciliation silently rotated it. The secret is SOPS-encrypted in
+      # grafana-admin.sops.yaml.
+      admin:
+        existingSecret: grafana-admin
+        userKey: admin-user
+        passwordKey: admin-password
       persistence:
         enabled: true
         type: pvc

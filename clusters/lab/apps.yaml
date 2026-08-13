@@ -15,6 +15,13 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-system
+  # Decrypts any SOPS-encrypted resource in this path. The age key lives in the
+  # sops-age Secret, applied by hand: it is the one secret that can never be in
+  # Git, because everything else is encrypted with it.
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
   # Storage first: on a rebuild from scratch, PVCs here need Longhorn's
   # StorageClass to already exist.
   dependsOn:

@@ -1,0 +1,9 @@
+# Encryption rules for SOPS. `sops -e` picks the matching rule automatically, so
+# nobody has to remember which key to use.
+creation_rules:
+  # Only the values are encrypted, never the keys or the document structure.
+  # A diff still shows which field changed, and a reviewer can read a manifest
+  # without decrypting anything.
+  - path_regex: .*\.sops\.yaml$
+    encrypted_regex: ^(data|stringData)$
+    age: age1agw3h63p0ntmsn7umlmy8jct5rcqvnas6ayzrtqek483xnx6vdrsdstx8s

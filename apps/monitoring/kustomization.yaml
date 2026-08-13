@@ -5,6 +5,9 @@ resources:
   - namespace.yaml
   - helmrepository.yaml
   - helmrelease.yaml
+  # Encrypted with SOPS. kustomize passes the ciphertext through untouched and
+  # Flux's kustomize-controller decrypts it after the build.
+  - grafana-admin.sops.yaml
 
 # Builds the dashboard ConfigMap straight from the JSON file. This replaces the
 # Helm .Files.Get workaround, and sidesteps the brace clash entirely since
