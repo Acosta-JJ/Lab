@@ -494,22 +494,6 @@ Besides the two extensions:
 - Longhorn replicates, it does not back up. A `DROP TABLE` replicates instantly.
   Configure a backup target and schedule `talosctl etcd snapshot`.
 
-## Files to back up, off this machine
-
-Everything else in the cluster is reproducible from this repository. These are
-not. Losing any of them means regenerating credentials or rebuilding from
-scratch; keep them in a password manager or on encrypted storage.
-
-| File | Why it cannot be replaced |
-|---|---|
-| `~/Desktop/Lab-secrets/secrets.yaml` | Talos, Kubernetes, etcd and aggregator CAs plus bootstrap tokens. Without it no **new node** can ever join — which is what a dead Pi or a worn-out SD card needs. Recoverable from `controlplane.yaml` via `talosctl gen secrets --from-controlplane-config`, but both live in the same directory, so one accident takes both. |
-| `~/Desktop/Lab-secrets/talosconfig` | Admin credential for the Talos API. Regenerable from `secrets.yaml`. |
-| `~/Desktop/Lab-secrets/flux/deploy-key` | SSH key Flux uses to pull this repository. Regenerable, but then the deploy key on GitHub has to be replaced too. |
-| `~/Desktop/Lab-secrets/kubeconfig` | Retrievable with `talosctl kubeconfig` while the cluster is healthy, so the least critical of the four. |
-
-The age private key belongs on this list as soon as SOPS is set up — it is the
-one secret that is never in Git, because everything else is encrypted with it.
-
 ## Conventions
 
 - **Everything in this repo is written in English.** Conversation with the owner
