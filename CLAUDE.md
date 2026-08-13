@@ -148,6 +148,30 @@ no-op upgrade — Helm went to revision 2 with zero pod restarts and volumes
 staying attached. Any drift in those values would have restarted storage
 components underneath live volumes.
 
+**Secrets: SOPS with age.** Native support in Flux is why this cluster left Argo
+CD. Files matching `*.sops.yaml` are encrypted per `.sops.yaml`, and both
+Kustomizations carry a `decryption` block pointing at the `sops-age` Secret.
+
+Only *values* are encrypted, never keys or structure, so a diff still shows which
+field changed and a manifest can be reviewed without decrypting it.
+
+```bash
+export SOPS_AGE_KEY_FILE=<path to the age key>   # put this in ~/.zshrc
+sops apps/monitoring/grafana-admin.sops.yaml     # decrypts, opens $EDITOR, re-encrypts
+```
+
+**There is always exactly one secret applied by hand: the key that decrypts the
+rest.** `sops-age` in `flux-system` is it, and it can never live in Git.
+
+`grafana-admin.sops.yaml` is the worked example. Before it, the chart generated a
+random admin password on every render, so each reconciliation rotated it
+silently; `grafana.admin.existingSecret` pins it.
+
+Note that changing `existingSecret` replaces the Grafana pod, and its RWO
+Longhorn volume has to detach from the old pod before the new one can mount it.
+Transient `MountVolume.WaitForAttach` errors during that handover are expected,
+not a fault.
+
 **To deploy something new: create a directory under `apps/` and add it to
 `apps/kustomization.yaml`.** Flux has no equivalent of Argo's directory
 generator, so applications are listed rather than discovered — one extra line
