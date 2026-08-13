@@ -172,6 +172,19 @@ Longhorn volume has to detach from the old pod before the new one can mount it.
 Transient `MountVolume.WaitForAttach` errors during that handover are expected,
 not a fault.
 
+**`GF_SECURITY_ADMIN_PASSWORD` only applies when Grafana initialises its
+database.** Point it at a new secret on an existing install and the container
+gets the new value in its environment while the admin user in `grafana.db` keeps
+the old one — login fails and everything looks correctly configured. Two ways
+out: `grafana-cli admin reset-admin-password`, or delete the Grafana PVC and let
+it reinitialise. The second is the GitOps answer, since it makes the running
+state match what Git declares, and nothing is lost: dashboards come from
+ConfigMaps and datasources from the chart.
+
+Repeated failed logins also trip Grafana's brute-force protection
+(`too many consecutive incorrect login attempts`), which masks the real cause —
+after that, even the right password is rejected for a few minutes.
+
 **To deploy something new: create a directory under `apps/` and add it to
 `apps/kustomization.yaml`.** Flux has no equivalent of Argo's directory
 generator, so applications are listed rather than discovered — one extra line
