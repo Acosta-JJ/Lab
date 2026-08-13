@@ -1,0 +1,104 @@
+# Flux installs Helm charts directly, so the umbrella chart that Argo needed is
+# gone. Values sit here un-nested, rather than under the dependency name.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kube-prometheus-stack
+  namespace: monitoring
+spec:
+  interval: 30m
+  # Installing this chart on these ARM cores takes minutes, not seconds.
+  timeout: 20m
+  chart:
+    spec:
+      chart: kube-prometheus-stack
+      version: "88.3.0"
+      sourceRef:
+        kind: HelmRepository
+        name: prometheus-community
+        namespace: monitoring
+  install:
+    crds: Create
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+
+  values:
+    # No alert routing configured yet, and it would cost RAM plus another PVC.
+    alertmanager:
+      enabled: false
+
+    # Talos renders the kube-proxy manifest at bootstrap and does not reconcile
+    # extraArgs into it, so its metrics stay bound to localhost. Disabling this
+    # avoids a scrape target that would fail forever and look like a real fault.
+    kubeProxy:
+      enabled: false
+
+    # The chart discovers etcd through a headless Service backed by a v1
+    # Endpoints object, deprecated in Kubernetes 1.33+. Static targets below
+    # replace it.
+    kubeEtcd:
+      enabled: false
+
+    prometheus:
+      prometheusSpec:
+        # 60s instead of the default 30s. Halves the samples, and therefore the
+        # writes: every sample lands on an SD card twice, once per Longhorn
+        # replica.
+        scrapeInterval: 60s
+        evaluationInterval: 60s
+
+        # Both limits are set because retention alone would let a metrics
+        # explosion fill the volume before the 24h elapsed.
+        retention: 24h
+        retentionSize: 1500MB
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 400Mi
+          limits:
+            memory: 1200Mi
+
+        storageSpec:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: longhorn
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: 2Gi
+
+        # Talos exposes etcd metrics unauthenticated on 2381 on every control
+        # plane node. etcd_disk_wal_fsync_duration_seconds is the number that
+        # says whether the SD cards are hurting etcd.
+        additionalScrapeConfigs:
+          - job_name: etcd
+            static_configs:
+              - targets:
+                  - 192.168.1.11:2381
+                  - 192.168.1.12:2381
+                  - 192.168.1.13:2381
+
+    grafana:
+      persistence:
+        enabled: true
+        type: pvc
+        storageClassName: longhorn
+        accessModes: ["ReadWriteOnce"]
+        size: 1Gi
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 384Mi
+
+    prometheusOperator:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi

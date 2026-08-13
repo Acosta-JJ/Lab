@@ -1,0 +1,6 @@
+# Adding an application means creating its directory and listing it here.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - busybox-longhorn-test
+  - monitoring

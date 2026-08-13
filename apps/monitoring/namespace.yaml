@@ -1,0 +1,11 @@
+# node-exporter reads /proc, /sys and the host network, so it needs hostNetwork,
+# hostPID, hostPath volumes and a hostPort. Talos enforces the baseline
+# PodSecurity profile by default and rejects all four without this label.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged

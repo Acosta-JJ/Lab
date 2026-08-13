@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+resources:
+  - namespace.yaml
+  - helmrepository.yaml
+  - helmrelease.yaml
+
+# Builds the dashboard ConfigMap straight from the JSON file. This replaces the
+# Helm .Files.Get workaround, and sidesteps the brace clash entirely since
+# kustomize does not template file contents.
+configMapGenerator:
+  - name: grafana-dashboard-raspberry
+    files:
+      - raspberry.json=dashboards/raspberry.json
+    options:
+      labels:
+        grafana_dashboard: "1"
+      # Without this the name gets a content hash appended and Grafana's sidecar
+      # sees a new dashboard on every change instead of an update.
+      disableNameSuffixHash: true

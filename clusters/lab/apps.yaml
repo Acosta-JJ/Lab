@@ -1,0 +1,17 @@
+# Entry point for everything under apps/. Flux has no equivalent of Argo's
+# directory generator, so applications are listed in apps/kustomization.yaml
+# rather than discovered.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: apps
+  namespace: flux-system
+spec:
+  interval: 10m
+  path: ./apps
+  prune: true
+  # Long, because installing kube-prometheus-stack on these ARM cores is slow.
+  timeout: 20m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system

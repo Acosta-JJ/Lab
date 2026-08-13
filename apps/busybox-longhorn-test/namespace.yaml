@@ -1,0 +1,6 @@
+# Flux does not create namespaces implicitly the way Argo's CreateNamespace did,
+# so every application declares its own.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: busybox-longhorn-test
