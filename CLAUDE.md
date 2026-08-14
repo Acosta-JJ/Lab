@@ -494,6 +494,39 @@ Verify after writing with `diskutil list`: a correctly flashed card shows a
 the **rest of the card unallocated**. `EPHEMERAL` is only created and grown on
 first boot, so unallocated space is expected until the node has booted once.
 
+### The fan needs a DaemonSet, because the kernel has no driver for it
+
+Talos runs the mainline kernel, which does not ship `pwm-rp1`. Linux therefore
+never registers a cooling device — `/sys/class/thermal` holds a `thermal_zone0`
+and no `cooling_device` at all — and the Active Cooler never spins. The boards
+were reaching 90 °C. This is upstream issue
+[sbc-raspberrypi#90](https://github.com/siderolabs/sbc-raspberrypi/issues/90),
+open since April 2026, with the mainline RP1 PWM patches still in review.
+
+It is **not** a `config.txt` problem: `dtparam=cooling_fan=on` would have
+nothing to bind to.
+
+`apps/rpi-fan/` drives the PWM directly through the RP1's PCI BAR, following
+Raspberry Pi's own fan curve with 5 °C hysteresis. Temperatures went from
+72/83/75 °C to 40/52/46 °C.
+
+Three things about it are deliberate:
+
+- **The register offsets are copied verbatim** from a script derived from the
+  kernel sources. The RP1 also hosts ethernet and USB, so a wrong offset does
+  not mean "the fan stays off", it means losing a node's network. Any change
+  deserves a staged rollout — one node, confirm the fan and the node's
+  connectivity, then widen.
+- **On shutdown the fan is set to 100 %.** The hardware keeps its last duty
+  cycle after the process exits, so maximum cooling is the safe thing to leave
+  behind. Expect a node's fan to run flat out if its pod is evicted.
+- **The ConfigMap keeps its name hash**, unlike the Grafana dashboard, so
+  editing the script rolls the pods instead of leaving old code running.
+
+**Remove this once mainline ships `pwm-rp1`** — the kernel driver and this would
+fight over the same peripheral. And it disappears entirely on server hardware:
+this is a Pi-5-on-mainline problem, not a Talos one.
+
 ### Raspberry Pi 5 specifics
 
 - Only the **HDMI port closest to the USB-C connector** works.
