@@ -12,11 +12,10 @@ spec:
       labels:
         app: rpi-fan
     spec:
-      # Rolled out to one node first. Widen by removing this selector once the
-      # fan is confirmed spinning and the node's network is still healthy — the
-      # RP1 also hosts ethernet and USB.
-      nodeSelector:
-        kubernetes.io/hostname: rpi-1
+      # Verified on rpi-3 and rpi-1 before widening: the fan responds and the
+      # RP1 writes leave ethernet and etcd healthy. The RP1 also hosts ethernet
+      # and USB, so any change to the register offsets deserves the same staged
+      # rollout.
       hostPID: false
       containers:
         - name: fan-control
