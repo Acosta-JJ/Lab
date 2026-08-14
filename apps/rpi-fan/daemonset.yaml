@@ -16,7 +16,7 @@ spec:
       # fan is confirmed spinning and the node's network is still healthy — the
       # RP1 also hosts ethernet and USB.
       nodeSelector:
-        kubernetes.io/hostname: rpi-3
+        kubernetes.io/hostname: rpi-1
       hostPID: false
       containers:
         - name: fan-control
