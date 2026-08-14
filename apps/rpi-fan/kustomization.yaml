@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: rpi-fan
+resources:
+  - namespace.yaml
+  - daemonset.yaml
+
+configMapGenerator:
+  - name: rpi-fan-script
+    files:
+      - fan-control.py
+    # The name hash is deliberately kept here, unlike the Grafana dashboard:
+    # it changes when the script changes, which rewrites the DaemonSet's
+    # reference and rolls the pods. Without it, editing the script would leave
+    # the old code running.

@@ -1,0 +1,11 @@
+# The fan controller writes to the RP1's PCI BAR, so it needs a privileged
+# container and a host path. Talos enforces the baseline PodSecurity profile by
+# default and rejects both.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rpi-fan
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged

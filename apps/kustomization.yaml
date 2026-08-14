@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - busybox-longhorn-test
   - monitoring
+  - rpi-fan
