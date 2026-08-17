@@ -21,6 +21,11 @@ spec:
         - name: fan-control
           image: python:3.12-slim
           command: ["python3", "/scripts/fan-control.py"]
+          env:
+            # Fans held at full speed. Remove this variable to go back to the
+            # temperature curve.
+            - name: FAN_SPEED
+              value: "100"
           securityContext:
             privileged: true
           volumeMounts:

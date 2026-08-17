@@ -25,6 +25,10 @@ RESOURCE1 = "/host-sys/bus/pci/devices/0002:01:00.0/resource1"
 THERMAL = "/host-sys/class/thermal/thermal_zone0/temp"
 INTERVAL = 10
 
+# Set FAN_SPEED to pin the fan at a fixed percentage and ignore the curve.
+# Unset it to go back to temperature-driven control.
+FIXED_SPEED = os.environ.get("FAN_SPEED")
+
 # Raspberry Pi's own fan curve: (temperature, speed %). Below the first entry
 # the fan is off. HYSTERESIS keeps it from oscillating around a threshold.
 CURVE = [(50, 30), (60, 50), (67, 70), (75, 100)]
@@ -131,6 +135,21 @@ signal.signal(signal.SIGTERM, on_exit)
 signal.signal(signal.SIGINT, on_exit)
 
 setup()
+
+if FIXED_SPEED is not None:
+    speed = max(0, min(100, int(FIXED_SPEED)))
+    set_speed(speed)
+    print(f"fan pinned at {speed}%, temperature curve disabled", flush=True)
+    while True:
+        # Rewrite periodically so the fan recovers if anything else disturbs the
+        # PWM registers, and log the temperature for the dashboards.
+        set_speed(speed)
+        try:
+            print(f"{temperature():.1f}C, fan held at {speed}%", flush=True)
+        except Exception:  # noqa: BLE001
+            pass
+        time.sleep(60)
+
 print(f"fan control started, curve={CURVE} hysteresis={HYSTERESIS}C", flush=True)
 
 current = 100
